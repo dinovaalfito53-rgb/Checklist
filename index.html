@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Number Checklist</title>
+    <!-- Tailwind CSS untuk styling modern dan cepat -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen p-4 sm:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-emerald-600 mb-2">WhatsApp Number Checklist</h1>
+            <p class="text-slate-600">Masukkan daftar nomor HP, lakukan chat, dan tandai statusnya dengan mudah.</p>
+        </header>
+
+        <!-- Input Section -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8 border border-slate-100">
+            <label for="numberInput" class="block text-sm font-semibold text-slate-700 mb-2">Masukkan Daftar Nomor HP (Satu nomor per baris):</label>
+            <textarea id="numberInput" rows="5" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono text-sm" placeholder="Contoh:&#10;08123456789&#10;+62 898-7654-321&#10;085612345678"></textarea>
+            <div class="mt-4 flex flex-wrap gap-3">
+                <button onclick="loadNumbers()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-5 py-2.5 rounded-lg transition shadow-sm cursor-pointer">
+                    Muat Daftar Nomor
+                </button>
+                <button onclick="clearAllData()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 font-medium px-4 py-2.5 rounded-lg transition border border-rose-200 cursor-pointer">
+                    Reset Semua Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard / Progress -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium uppercase">Total Nomor</p>
+                    <h3 id="statTotal" class="text-2xl font-bold text-slate-800">0</h3>
+                </div>
+                <div class="p-3 bg-slate-100 rounded-lg text-slate-600">📊</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium uppercase">Done (Selesai)</p>
+                    <h3 id="statDone" class="text-2xl font-bold text-emerald-600">0</h3>
+                </div>
+                <div class="p-3 bg-emerald-50 rounded-lg text-emerald-600">✅</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-500 font-medium uppercase">Tidak Terdaftar</p>
+                    <h3 id="statInvalid" class="text-2xl font-bold text-rose-600">0</h3>
+                </div>
+                <div class="p-3 bg-rose-50 rounded-lg text-rose-600">❌</div>
+            </div>
+        </div>
+
+        <!-- List Section -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden border border-slate-100">
+            <div class="p-4 bg-slate-100 border-b border-slate-200 font-semibold text-slate-700 flex justify-between items-center">
+                <span>Daftar Nomor</span>
+                <span id="activeListCount" class="text-xs bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full">0 item</span>
+            </div>
+            <div id="numberListContainer" class="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
+                <!-- Item list akan masuk ke sini secara dinamis -->
+                <div class="p-8 text-center text-slate-400">
+                    Belum ada nomor yang dimuat. Silakan masukkan nomor di atas.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Logika -->
+    <script>
+        let numbersData = [];
+
+        // Load data dari LocalStorage saat pertama buka
+        window.onload = function() {
+            const savedData = localStorage.getItem('wa_checklist_data');
+            if (savedData) {
+                numbersData = JSON.parse(savedData);
+                renderList();
+            }
+        };
+
+        function saveData() {
+            localStorage.setItem('wa_checklist_data', JSON.stringify(numbersData));
+            updateStats();
+        }
+
+        function loadNumbers() {
+            const rawText = document.getElementById('numberInput').value;
+            if (!rawText.trim()) {
+                alert('Silakan masukkan setidaknya satu nomor HP.');
+                return;
+            }
+
+            const lines = rawText.split('\n');
+            let newCount = 0;
+
+            lines.forEach(line => {
+                let cleaned = line.replace(/\D/g, ''); // Ambil angkanya saja
+                if (cleaned.length > 5) {
+                    // Format ubah 08... jadi 628...
+                    if (cleaned.startsWith('0')) {
+                        cleaned = '62' + cleaned.substring(1);
+                    }
+                    
+                    // Cek apakah sudah ada di list agar tidak duplikat
+                    const exists = numbersData.some(item => item.phone === cleaned);
+                    if (!exists) {
+                        numbersData.push({
+                            phone: cleaned,
+                            status: 'pending' // pending, done, invalid
+                        });
+                        newCount++;
+                    }
+                }
+            });
+
+            document.getElementById('numberInput').value = '';
+            saveData();
+            renderList();
+            alert(`Berhasil memuat ${newCount} nomor baru!`);
+        }
+
+        function setStatus(index, status) {
+            numbersData[index].status = status;
+            saveData();
+            renderList();
+        }
+
+        function deleteItem(index) {
+            if (confirm('Yakin ingin menghapus nomor ini dari daftar?')) {
+                numbersData.splice(index, 1);
+                saveData();
+                renderList();
+            }
+        }
+
+        function clearAllData() {
+            if (confirm('PERINGATAN: Semua data checklist akan dihapus permanen!')) {
+                numbersData = [];
+                localStorage.removeItem('wa_checklist_data');
+                renderList();
+                document.getElementById('numberInput').value = '';
+            }
+        }
+
+        function updateStats() {
+            const total = numbersData.length;
+            const done = numbersData.filter(i => i.status === 'done').length;
+            const invalid = numbersData.filter(i => i.status === 'invalid').length;
+
+            document.getElementById('statTotal').innerText = total;
+            document.getElementById('statDone').innerText = done;
+            document.getElementById('statInvalid').innerText = invalid;
+            document.getElementById('activeListCount').innerText = `${total} item`;
+        }
+
+        function renderList() {
+            const container = document.getElementById('numberListContainer');
+            
+            if (numbersData.length === 0) {
+                container.innerHTML = `
+                    <div class="p-8 text-center text-slate-400">
+                        Belum ada nomor yang dimuat. Silakan masukkan nomor di atas.
+                    </div>
+                `;
+                updateStats();
+                return;
+            }
+
+            let html = '';
+            numbersData.forEach((item, index) => {
+                let statusBadge = '';
+                let rowBg = 'bg-white';
+
+                if (item.status === 'done') {
+                    statusBadge = '<span class="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-medium">Done</span>';
+                    rowBg = 'bg-emerald-50/40';
+                } else if (item.status === 'invalid') {
+                    statusBadge = '<span class="text-xs bg-rose-100 text-rose-700 px-2.5 py-1 rounded-full font-medium">Tidak Terdaftar</span>';
+                    rowBg = 'bg-rose-50/40';
+                } else {
+                    statusBadge = '<span class="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium">Pending</span>';
+                }
+
+                html += `
+                    <div class="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${rowBg} transition">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs text-slate-400 font-mono w-6">#${index + 1}</span>
+                            <div>
+                                <span class="font-mono font-semibold text-slate-800 text-base">+${item.phone}</span>
+                                <div class="mt-1">${statusBadge}</div>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+                            <a href="https://wa.me/${item.phone}" target="_blank" class="bg-sky-500 hover:bg-sky-600 text-white text-xs px-3 py-2 rounded-lg font-medium transition flex items-center gap-1 shadow-sm">
+                                💬 Chat
+                            </a>
+                            <button onclick="setStatus(${index}, 'done')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition cursor-pointer shadow-sm">
+                                ✓ Done
+                            </button>
+                            <button onclick="setStatus(${index}, 'invalid')" class="bg-rose-500 hover:bg-rose-600 text-white text-xs px-3 py-2 rounded-lg font-medium transition cursor-pointer shadow-sm">
+                                ✕ Invalid
+                            </button>
+                            <button onclick="deleteItem(${index})" class="text-slate-400 hover:text-rose-600 p-2 text-xs transition cursor-pointer" title="Hapus">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            updateStats();
+        }
+    </script>
+</body>
+</html>
